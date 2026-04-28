@@ -1,1 +1,212 @@
-<!DOCTYPE html><html><head><title>مطہنوخہ الہشہمالہ</title></head><body><h1>مرحبا بك في المشروع</h1></body></html>
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مطنوخ الشمال - واجهة تفاعلية</title>
+<style>
+body { margin:0; font-family: Arial, sans-serif; background: linear-gradient(to bottom, #4b2e2e, #1e3d59); color:#fff; }
+header { background-color: #4b2e2e; padding: 20px; text-align:center; font-size:2em; font-weight:bold; }
+.hidden { display:none; }
+.container { padding:20px; }
+button { padding:10px 15px; margin:5px; cursor:pointer; background:#1e3d59; border:none; color:#fff; border-radius:5px; transition: all 0.3s ease; }
+input { padding:8px; margin:5px 0; width:100%; box-sizing:border-box; border-radius:5px; border:none; }
+.room { border:1px solid #fff; padding:10px; margin:10px 0; border-radius:5px; display:flex; align-items:center; justify-content:space-between; }
+.mic-btn { background-color:#8b0000; color:#fff; border:none; padding:5px 10px; border-radius:3px; transition: all 0.3s ease; display:flex; align-items:center; gap:5px; }
+.mic-active { box-shadow: 0 0 15px #ff0000; transform: scale(1.1); animation: pulse 1s infinite; }
+@keyframes pulse { 0% { transform: scale(1.1);} 50% { transform: scale(1.2);} 100% { transform: scale(1.1);} }
+.admin-btn { background-color:#006400; margin-left:10px; }
+.mic-bar { height:5px; background:#fff; border-radius:3px; margin-top:5px; }
+.mic-progress { height:5px; background:#ff0000; border-radius:3px; width:0%; transition: width 1s linear; }
+.room-icon { width:24px; height:24px; margin-right:10px; }
+</style>
+</head>
+<body>
+
+<header>مطنوخ الشمال</header>
+
+<div class="container" id="startPage">
+  <h2>مرحبا بك في مطنوخ الشمال</h2>
+  <button onclick="showLogin()">تسجيل الدخول</button>
+  <button onclick="showRegister()">التسجيل</button>
+</div>
+
+<div class="container hidden" id="loginPage">
+  <h2>تسجيل الدخول</h2>
+  <input type="text" id="loginUsername" placeholder="اسم المستخدم">
+  <input type="password" id="loginPassword" placeholder="كلمة المرور">
+  <button onclick="login()">دخول</button>
+  <button onclick="backToStart()">رجوع</button>
+</div>
+
+<div class="container hidden" id="registerPage">
+  <h2>التسجيل</h2>
+  <input type="text" id="registerUsername" placeholder="اسم المستخدم">
+  <input type="password" id="registerPassword" placeholder="كلمة المرور">
+  <button onclick="register()">تسجيل</button>
+  <button onclick="backToStart()">رجوع</button>
+</div>
+
+<div class="container hidden" id="chatPage">
+  <h2>غرف الشات</h2>
+  <div id="roomsList"></div>
+  <button id="addRoomBtn" onclick="addRoom()">إضافة غرفة جديدة</button>
+  <button onclick="logout()">خروج</button>
+</div>
+
+<div class="container hidden" id="adminPage">
+  <h2>لوحة تحكم الماستر</h2>
+  <div id="adminRooms"></div>
+  <button onclick="backToChat()">رجوع لغرف الشات</button>
+</div>
+
+<script>
+let users = [];
+let currentUser = null;
+let rooms = [
+  {name:'غرفة 1', micOwner:null, micTime:0, admins:[]},
+  {name:'غرفة 2', micOwner:null, micTime:0, admins:[]},
+];
+
+function showLogin(){ togglePages('loginPage'); }
+function showRegister(){ togglePages('registerPage'); }
+function backToStart(){ togglePages('startPage'); }
+function backToChat(){ togglePages('chatPage'); }
+function togglePages(pageId){
+  ['startPage','loginPage','registerPage','chatPage','adminPage'].forEach(id=>{
+    document.getElementById(id).classList.add('hidden');
+  });
+  document.getElementById(pageId).classList.remove('hidden');
+}
+
+function register(){
+  let username=document.getElementById('registerUsername').value;
+  let password=document.getElementById('registerPassword').value;
+  if(!username||!password){ alert('املأ جميع الحقول'); return; }
+  if(users.find(u=>u.username===username)){ alert('المستخدم موجود'); return; }
+  users.push({username,password,isAdmin:false});
+  alert('تم التسجيل بنجاح!'); backToStart();
+}
+
+function login(){
+  let username=document.getElementById('loginUsername').value;
+  let password=document.getElementById('loginPassword').value;
+  let user=users.find(u=>u.username===username&&u.password===password);
+  if(user){ currentUser=user; showChat(); }
+  else { alert('بيانات غير صحيحة'); }
+}
+
+function logout(){ currentUser=null; backToStart(); }
+
+function showChat(){
+  togglePages('chatPage');
+  document.getElementById('addRoomBtn').style.display = currentUser.isAdmin ? 'inline-block' : 'none';
+  renderRooms();
+}
+
+function renderRooms(){
+  let container=document.getElementById('roomsList'); container.innerHTML='';
+  rooms.forEach((room,i)=>{
+    let div=document.createElement('div'); div.className='room';
+    let adminsList=room.admins.map(a=>a.username).join(', ') || 'لا يوجد';
+    div.innerHTML=`
+      <div style="display:flex; align-items:center;">
+        <svg class="room-icon" viewBox="0 0 24 24" fill="white">
+          <circle cx="12" cy="12" r="10"/>
+        </svg>
+        <div>
+          <strong>${room.name}</strong><br>
+          مشرفون: ${adminsList}<br>
+          مايك: ${room.micOwner?room.micOwner.username:'فارغ'}
+          ${room.micTime>0?'('+room.micTime+' ثانية)':''}
+          <div class="mic-bar"><div class="mic-progress" id="micProgress${i}"></div></div>
+        </div>
+      </div>
+    `;
+    let micBtn=document.createElement('button');
+    micBtn.className='mic-btn';
+    micBtn.innerHTML='🎤 ' + (room.micOwner===currentUser?'إيقاف المايك':'تشغيل المايك');
+    micBtn.onclick=()=>toggleMic(i,micBtn);
+    if(room.micOwner===currentUser){ micBtn.classList.add('mic-active'); }
+    div.appendChild(micBtn);
+
+    if(currentUser.isAdmin){
+      let adminBtn=document.createElement('button');
+      adminBtn.className='admin-btn';
+      adminBtn.innerText='إدارة المشرفين';
+      adminBtn.onclick=()=>manageAdmins(i);
+      div.appendChild(adminBtn);
+    }
+    container.appendChild(div);
+    updateMicProgress(i);
+  });
+}
+
+function toggleMic(index,btn){
+  let room=rooms[index];
+  if(room.micOwner===currentUser){ room.micOwner=null; room.micTime=0; btn.classList.remove('mic-active'); }
+  else{
+    if(room.micOwner){ alert('المايك مستخدم حالياً'); return; }
+    room.micOwner=currentUser; room.micTime=60;
+    btn.classList.add('mic-active');
+    let timer=setInterval(()=>{
+      room.micTime--;
+      updateMicProgress(index);
+      if(room.micTime<=0){ room.micOwner=null; room.micTime=0; btn.classList.remove('mic-active'); clearInterval(timer); }
+      renderRooms();
+    },1000);
+  }
+  renderRooms();
+}
+
+function updateMicProgress(index){
+  let progress=document.getElementById(`micProgress${index}`);
+  if(progress){ progress.style.width = (rooms[index].micTime/60*100) + '%'; }
+}
+
+function addRoom(){
+  if(!currentUser.isAdmin){ alert('فقط الماستر يمكنه إضافة غرف'); return; }
+  let name=prompt('اسم الغرفة:');
+  if(name){ rooms.push({name,micOwner:null,micTime:0,admins:[]}); renderRooms(); renderAdminRooms(); }
+}
+
+function manageAdmins(roomIndex){
+  togglePages('adminPage'); renderAdminRooms(roomIndex);
+}
+
+function renderAdminRooms(roomIndex){
+  let container=document.getElementById('adminRooms'); container.innerHTML='';
+  rooms.forEach((room,i)=>{
+    let div=document.createElement('div'); div.className='room';
+    let adminsList=room.admins.map(a=>a.username).join(', ') || 'لا يوجد';
+    div.innerHTML=`<strong>${room.name}</strong><br>مشرفون: ${adminsList}`;
+    if(currentUser.isAdmin && i===roomIndex){
+      let addBtn=document.createElement('button'); addBtn.innerText='إضافة مشرف'; 
+      addBtn.onclick=()=>{
+        let username=prompt('اسم المستخدم ليصبح مشرف:');
+        let user=users.find(u=>u.username===username);
+        if(user){ 
+          if(room.admins.includes(user)){ alert('هو بالفعل مشرف'); return; }
+          if(room.admins.length>=3){ alert('الحد الأقصى 3 مشرفين'); return; }
+          room.admins.push(user); renderAdminRooms(roomIndex); renderRooms();
+        } else alert('المستخدم غير موجود');
+      };
+      div.appendChild(addBtn);
+    }
+    container.appendChild(div);
+  });
+}
+
+function createMasterIfNone(){
+  if(users.length>0 && !users.some(u=>u.isAdmin)){
+    users[0].isAdmin=true;
+  }
+}
+setInterval(createMasterIfNone,1000);
+</script>
+
+</body>
+</html>
+
+
+
